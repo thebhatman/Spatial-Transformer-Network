@@ -43,17 +43,26 @@ function get_pixel_values(img, x, y)
 	x = trunc.(Int, x)
 	y = trunc.(Int, y)
 
+	x_indices = []
+	y_indices = []
+	for i in 1:batch_size
+		push!(x_indices, diag(x[:, :, i]))
+		push!(y_indices, diag(y[:, :, i]))
+	end
+	x_indices = reshape(cat(x_indices..., dims = 4), width, batch_size)
+	y_indices = reshape(cat(y_indices..., dims = 4), height, batch_size)
 	batch = []
 	#println(size(img))
 	println(batch_size)
 	for i in 1:batch_size
 		pic = colorview(RGB, reshape(img[:, :, :, i], channels, width, height))
-		new_pic = pic
-		for j in 1:height
-			for k in 1:width
-				new_pic[j, k] = pic[y[k, j, i], x[k, j, i]]
-			end
-		end
+		new_pic = pic[y_indices[:, i], x_indices[:, i]]
+		# new_pic = pic
+		# for j in 1:height
+		# 	for k in 1:width
+		# 		new_pic[j, k] = pic[y[k, j, i], x[k, j, i]]
+		# 	end
+		# end
 		push!(batch, reshape(Float64.(channelview(new_pic)), width, height, channels))
 	end
 	batch = reshape(cat(batch..., dims = 4),width, height, channels, batch_size)
