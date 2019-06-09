@@ -2,9 +2,11 @@ using Images
 using ImageView
 using Flux#, Flux.Data.MNIST
 using Flux: onehotbatch, onecold
+using Flux.Tracker: update!
 using LinearAlgebra
 using Base.Iterators: partition
 using BatchedRoutines
+using MAT
 
 BATCH_SIZE = 128
 # imgs = MNIST.images()
@@ -12,6 +14,18 @@ BATCH_SIZE = 128
 #
 # data = [reshape(hcat(Array(channelview.(imgs))...), 28, 28, 1,:) for imgs in partition(imgs, BATCH_SIZE)]
 # data = gpu.(data)
+
+data_file = matopen("C:/Users/manju/Downloads/training_and_validation_batches/1.mat")
+affNIST_data = read(data_file, "affNISTdata")
+imgs = affNIST_data["image"]
+labels = affNIST_data["label_one_of_n"]
+
+train_data = []
+for i in 1:60000
+	push!(train_data, permutedims(reshape(imgs[:, i], 40, 40, 1), [2, 1, 3]))
+end
+train_data = reshape(cat(train_data..., dims = 4), 40, 40, 1, 60000)
+
 
 NUM_EPOCHS = 50
 training_steps = 0
@@ -42,7 +56,6 @@ function get_pixel_values(img, x, y)
 
 	x = trunc.(Int, x)
 	y = trunc.(Int, y)
-
 	x_indices = []
 	y_indices = []
 	for i in 1:batch_size
@@ -168,3 +181,18 @@ model = Chain(Conv((3, 3), 3 => 32, relu ), MaxPool((2, 2)),
 			x -> relu.(x),
 			Dense(256, num_classes),
 			softmax)
+
+# function training(X)
+# 	loc_net = localization_net(X)
+# 	transformed_X = transformer(X, loc_net)
+# 	output = model(transformed_X)
+#
+# end
+
+
+for epoch in 1:NUM_EPOCHS
+	println("-------- Epoch : $epoch ---------")
+	for X in data
+		training(X)
+	end
+end
