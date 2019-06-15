@@ -20,12 +20,21 @@ affNIST_data = read(data_file, "affNISTdata")
 imgs = affNIST_data["image"]
 labels = affNIST_data["label_one_of_n"]
 
-train_data = []
+complete_train_data = []
+all_labels = []
 for i in 1:60000
-	push!(train_data, permutedims(reshape(imgs[:, i], 40, 40, 1), [2, 1, 3]))
+	push!(complete_train_data, permutedims(reshape(imgs[:, i], 40, 40, 1), [2, 1, 3]))
+	push!(all_labels, labels[:, i])
 end
-train_data = reshape(cat(train_data..., dims = 4), 40, 40, 1, 60000)
-
+train_data = []
+batched_labels = []
+for mini_batch in partition(complete_train_data, BATCH_SIZE)
+	push!(train_data, reshape(cat(mini_batch..., dims = 4), 40, 40, 1, BATCH_SIZE))
+end
+for mini_batch in partition(all_labels, BATCH_SIZE)
+	push!(batched_labels, reshape(cat(all_labels..., dims = 2), 10, BATCH_SIZE))
+end
+# train_data = reshape(cat(train_data..., dims = 4), 40, 40, 1, 60000)
 
 NUM_EPOCHS = 50
 training_steps = 0
@@ -182,17 +191,25 @@ model = Chain(Conv((3, 3), 3 => 32, relu ), MaxPool((2, 2)),
 			Dense(256, num_classes),
 			softmax)
 
-# function training(X)
-# 	loc_net = localization_net(X)
-# 	transformed_X = transformer(X, loc_net)
-# 	output = model(transformed_X)
-#
-# end
+opt = ADAM()
+function loss(x, y)
+	loc_net = localization_net(x)
+	transformed_X = transformer(X, loc_net)
+	output = model(transformed_X)
+	return crossentropy(output, y)
+end
 
+function training(X, y_label)
+	gradient = Flux.Tracker.gradient(() -> loss(X, y_label), params(localization_net, model))
+	update!(opt, params(localization_net, model), gradient)
+	return loss(X, y_label)
+end
 
 for epoch in 1:NUM_EPOCHS
 	println("-------- Epoch : $epoch ---------")
+	i = 1
 	for X in data
-		training(X)
+		current_loss = training(X, batched_labels[i])
+		i += 1
 	end
 end
